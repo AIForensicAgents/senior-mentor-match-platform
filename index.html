@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Senior Mentor-Match Platform</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/alpinejs@3.13.3/dist/cdn.min.js" defer></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        navy: { 50: '#f0f3f9', 100: '#d9e0ef', 200: '#b3c1df', 300: '#8da2cf', 400: '#6783bf', 500: '#4164af', 600: '#34508c', 700: '#273c69', 800: '#1a2846', 900: '#0d1423' },
+        gold: { 50: '#fefaf0', 100: '#fdf0d0', 200: '#fbe1a1', 300: '#f9d272', 400: '#f7c343', 500: '#f5b414', 600: '#c49010', 700: '#936c0c', 800: '#624808', 900: '#312404' },
+        sage: { 50: '#f4f7f4', 100: '#dfe8df', 200: '#bfd1bf', 300: '#9fba9f', 400: '#7fa37f', 500: '#5f8c5f', 600: '#4c704c', 700: '#395439', 800: '#263826', 900: '#131c13' },
+      },
+      fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }
+    }
+  }
+}
+</script>
+<style>
+  [x-cloak] { display: none !important; }
+  * { -webkit-tap-highlight-color: transparent; }
+  .slide-enter { animation: slideUp 0.3s ease-out; }
+  @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes pulse-dot { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.3); } }
+  .pulse-dot { animation: pulse-dot 2s infinite; }
+  .card-hover { transition: all 0.2s ease; }
+  .card-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.1); }
+  input, select, textarea { font-size: 16px !important; }
+  .gradient-bg { background: linear-gradient(135deg, #1a2846 0%, #273c69 50%, #34508c 100%); }
+  .gold-gradient { background: linear-gradient(135deg, #f5b414 0%, #f7c343 100%); }
+  .match-ring { background: conic-gradient(#f5b414 var(--pct), #e5e7eb var(--pct)); }
+</style>
+</head>
+<body class="font-sans bg-gray-50 min-h-screen" x-data="mentorApp()" x-init="init()">
+
+<!-- Loading Overlay -->
+<div x-show="loading" x-cloak class="fixed inset-0 bg-navy-900/80 z-50 flex items-center justify-center">
+  <div class="bg-white rounded-2xl p-8 mx-4 text-center max-w-sm">
+    <div class="w-16 h-16 border-4 border-navy-200 border-t-gold-500 rounded-full animate-spin mx-auto mb-4"></div>
+    <p class="text-navy-700 font-semibold text-lg" x-text="loadingMessage">Processing...</p>
+    <p class="text-navy-400 text-sm mt-2">Our AI is working its magic ✨</p>
+  </div>
+</div>
+
+<!-- Error Toast -->
+<div x-show="errorMessage" x-cloak x-transition class="fixed top-4 left-4 right-4 z-50 bg-red-50 border border-red-200 rounded-xl p-4 shadow-lg">
+  <div class="flex items-start gap-3">
+    <span class="text-2xl">⚠️</span>
+    <div class="flex-1">
+      <p class="text-red-800 font-medium text-sm" x-text="errorMessage"></p>
+      <button @click="errorMessage=''" class="text-red-600 text-xs mt-1 underline">Dismiss</button>
+    </div>
+  </div>
+</div>
+
+<!-- Success Toast -->
+<div x-show="successMessage" x-cloak x-transition class="fixed top-4 left-4 right-4 z-50 bg-sage-50 border border-sage-200 rounded-xl p-4 shadow-lg">
+  <div class="flex items-center gap-3">
+    <span class="text-2xl">✅</span>
+    <p class="text-sage-800 font-medium text-sm" x-text="successMessage"></p>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div class="max-w-lg mx-auto min-h-screen flex flex-col">
+
+  <!-- Header -->
+  <header class="gradient-bg text-white px-5 pt-6 pb-5 rounded-b-3xl shadow-lg relative overflow-hidden">
+    <div class="absolute top-0 right-0 w-40 h-40 bg-gold-500/10 rounded-full -translate-y-1/2 translate-x-1/2"></div>
+    <div class="relative z-10">
+      <div class="flex items-center justify-between mb-1">
+        <div>
+          <h1 class="text-xl font-bold tracking-tight">Senior Mentor-Match</h1>
+          <p class="text-navy-200 text-sm font-light">Knowledge transfer, powered by AI 🤝</p>
+        </div>
+        <button @click="showSettings = !showSettings" class="w-11 h-11 bg-white/10 rounded-full flex items-center justify-center">
+          <span class="text-xl" x-text="currentUser ? '👤' : '⚙️'"></span>
+        </button>
+      </div>
+      <template x-if="currentUser">
+        <div class="mt-3 bg-white/10 rounded-xl px-4 py-2 flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full gold-gradient flex items-center justify-center text-navy-900 font-bold text-sm" x-text="getInitials(currentUser.name)"></div>
+          <div class="flex-1 min-w-0">
+            <p class="font-semibold text-sm truncate" x-text="currentUser.name"></p>
+            <p class="text-navy-200 text-xs" x-text="currentUser.role === 'mentor' ? '🎓 Mentor' : '🌱 Mentee'"></p>
+          </div>
+          <span class="text-xs bg-sage-500/30 text-sage-100 px-2 py-1 rounded-full" x-text="currentUser.department"></span>
+        </div>
+      </template>
+    </div>
+  </header>
+
+  <!-- Navigation Tabs -->
+  <template x-if="currentUser">
+    <nav class="flex gap-1 px-4 py-3 bg-white border-b sticky top-0 z-30 overflow-x-auto">
+      <template x-for="tab in tabs" :key="tab.id">
+        <button @click="activeTab = tab.id" 
+                :class="activeTab === tab.id ? 'bg-navy-800 text-white' : 'bg-gray-100 text-gray-600'" 
+                class="flex items-center gap-1.5 px-4 py-2.5 rounded-full text-sm font-medium whitespace-nowrap transition-all min-h-[44px]">
+          <span x-text="tab.icon"></span>
+          <span x-text="tab.label"></span>
+        </button>
+      </template>
+    </nav>
+  </template>
+
+  <!-- Content Area -->
+  <main class="flex-1 px-4 py-4 pb-24">
+
+    <!-- ONBOARDING / PROFILE SETUP -->
+    <template x-if="!currentUser">
+      <div class="slide-enter">
+        <div class="text-center mb-8 mt-4">
+          <div class="text-6xl mb-4">🌟</div>
+          <h2 class="text-2xl font-bold text-navy-800 mb-2">Welcome to Mentor-Match</h2>
+          <p class="text-gray-500 text-sm leading-relaxed max-w-xs mx-auto">Connect senior leaders with rising talent through AI-powered matching, smart scheduling, and guided conversations.</p>
+        </div>
+
+        <!-- Step Indicator -->
+        <div class="flex items-center justify-center gap-2 mb-6">
+          <template x-for="s in 3" :key="s">
+            <div :class="onboardStep >= s ? 'bg-gold-500 w-8' : 'bg-gray-200 w-3'" class="h-3 rounded-full transition-all duration-300"></div>
+          </template>
+        </div>
+
+        <!-- Step 1: Basic Info -->
+        <div x-show="onboardStep === 1" class="space-y-4">
+          <div class="bg-white rounded-2xl p-5 shadow-sm border">
+            <h3 class="font-semibold text-navy-800 mb-4">📋 Tell us about yourself</h3>
+            <div class="space-y-3">
+              <div>
+                <label class="text-xs font-medium text-gray-500 mb-1 block">Full Name</label>
+                <input x-model="profile.name" type="text" placeholder="e.g., Sarah Johnson" class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-gold-400 focus:border-transparent outline-none">
+              </div>
+              <div>
+                <label class="text-xs font-medium text-gray-500 mb-1 block">Email</label>
+                <input x-model="profile.email" type="email" placeholder="sarah@company.com" class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-gold-400 focus:border-transparent outline-none">
+              </div>
+              <div>
+                <label class="text-xs font-medium text-gray-500 mb-1 block">I want to be a...</label>
+                <div class="grid grid-cols-2 gap-3">
+                  <button @click="profile.role = 'mentor'" :class="profile.role === 'mentor' ? 'border-gold-500 bg-gold-50 ring-2 ring-gold-400' : 'border-gray-200'" class="border rounded-xl p-4 text-center transition-all min-h-[80px]">
+                    <div class="text-3xl mb-1">🎓</div>
+                    <div class="font-semibold text-sm text-navy-800">Mentor</div>
+                    <div class="text-xs text-gray-400">Share wisdom</div>
+                  </button>
+                  <button @click="profile.role = 'mentee'" :class="profile.role === 'mentee' ? 'border-gold-500 bg-gold-50 ring-2 ring-gold-400' : 'border-gray-200'" class="border rounded-xl p-4 text-center transition-all min-h-[80px]">
+                    <div class="text-3xl mb-1">🌱</div>
+                    <div class="font-semibold text-sm text-navy-800">Mentee</div>
+                    <div class="text-xs text-gray-400">Grow skills</div>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <button @click="onboardStep = 2" :disabled="!profile.name || !profile.role" :class="!profile.name || !profile.role ? 'opacity-50' : ''" class="w-full gold-gradient text-navy-900 font-semibold py-4 rounded-xl shadow-md min-h-[52px]">Continue →</button>
+        </div>
+
+        <!-- Step 2: Professional Details -->
+        <div x-show="onboardStep === 2" class="space-y-4">
+          <div class="bg-white rounded-2xl p-5 shadow-sm border">
+            <h3 class="font-semibold text-navy-800 mb-4">💼 Professional Profile</h3>
+            <div class="space-y-3">
+              <div>
+                <label class="text-xs font-medium text-gray-500 mb-1 block">Department</label>
+                <select x-model="profile.department" class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-gold-400 outline-none bg-white">
+                  <option value="">Select department...</option>
+                  <option>Engineering</option>
+                  <option>Product</option>
+                  <option>Marketing</option>
+                  <option>Sales</option>
+                  <option>Finance</option>
+                  <option>HR</option>
+                  <option>Operations</option>
+                  <option>Legal</option>
+                  <option>Executive</option>
+                </select>
+              </div>
+              <div>
+                <label class="text-xs font-medium text-gray-500 mb-1 block">Years of Experience</label>
+                <input x-model="profile.experience" type="number" placeholder="e.g., 25" class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-gold-400 outline-none">
+              </div>
+              <div>
+                <label class="text-xs font-medium text-gray-500 mb-1 block">Job Title</label>
+                <input x-model="profile.title" type="text" placeholder="e.g., VP of Engineering" class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-gold-400 outline-none">
+              </div>
+              <div>
+                <label class="text-xs font-medium text-gray-500 mb-1 block">Timezone</label>
+                <select x-model="profile.timezone" class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-gold-400 outline-none bg-white">
+                  <option value="">Select timezone...</option>
+                  <option>US/Eastern (ET)</option>
+                  <option>US/Central (CT)</option>
+                  <option>US/Mountain (MT)</option>
+                  <option>US/Pacific (PT)</option>
+                  <option>Europe/London (GMT)</option>
+                  <option>Europe/Berlin (CET)</option>
+                  <option>Asia/Tokyo (JST)</option>
+                  <option>Asia/Singapore (SGT)</option>
+                  <option>Australia/Sydney (AEST)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="flex gap-3">
+            <button @click="onboardStep = 1" class="flex-1 bg-gray-100 text-gray-700 font-semibold py-4 rounded-xl min-h-[52px]">← Back</button>
+            <button @click="onboardStep = 3" :disabled="!profile.department || !profile.title" :class="!profile.department || !profile.title ? 'opacity-50' : ''" class="flex-1 gold-gradient text-navy-900 font-semibold py-4 rounded-xl shadow-md min-h-[52px]">Continue →</button>
+          </div>
+        </div>
+
+        <!-- Step 3: Skills & Goals -->
+        <div x-show="onboardStep === 3" class="space-y-4">
+          <div class="bg-white rounded-2xl p-5 shadow-sm border">
+            <h3 class="font-semibold text-navy-800 mb-4">🎯 Skills & Goals</h3>
+            <div class="space-y-3">
+              <div>
+                <label class="text-xs font-medium text-gray-500 mb-1 block" x-text="profile.role === 'mentor' ? 'Skills You Can Teach (comma separated)' : 'Skills You Want to Learn (comma separated)'"></label>
+                <textarea x-model="profile.skills" rows="3" :placeholder="profile.role === 'mentor' ? 'e.g., Leadership, Strategic Planning, Negotiation, Team Building' : 'e.g., Leadership, Public Speaking, Career Planning'" class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-gold-400 outline-none resize-none"></textarea>
+              </div>
+              <div>
+                <label class="text-xs font-medium text-gray-500 mb-1 block">Communication Style</label>
+                <div class="grid grid-cols-2 gap-2">
+                  <template x-for="style in ['Direct & Structured', 'Warm & Supportive', 'Socratic & Questioning', 'Collaborative']" :key="style">
+                    <button @click="profile.commStyle = style" :class="profile.commStyle === style ? 'border-gold-500 bg-gold-50' : 'border-gray-200'" class="border rounded-xl px-3 py-2.5 text-xs font-medium text-center transition-all min-h-[44px]" x-text="style"></button>
+                  </template>
+                </div>
+              </div>
+              <div>
+                <label class="text-xs font-medium text-gray-500 mb-1 block">Availability (hours per month)</label>
+                <div class="flex gap-2">
+                  <template x-for="hrs in ['2-4', '4-8', '8-12', '12+']" :key="hrs">
+                    <button @click="profile.availability = hrs" :class="profile.availability === hrs ? 'border-gold-500 bg-gold-50' : 'border-gray-200'" class="flex-1 border rounded-xl py-2.5 text-xs font-medium text-center transition-all min-h-[44px]" x-text="hrs + 'h'"></button>
+                  </template>
+                </div>
+              </div>
+              <div x-show="profile.role === 'mentor'">
+                <label class="text-xs font-medium text-gray-500 mb-1 block">What legacy do you want to leave? 🌳</label>
+                <textarea x-model="profile.legacy" rows="2" placeholder="e.g., I want to help the next generation of leaders navigate complex organizational challenges..." class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-gold-400 outline-none resize-none"></textarea>
+              </div>
+              <div x-show="profile.role === 'mentee'">
+                <label class="text-xs font-medium text-gray-500 mb-1 block">What's your biggest growth goal? 🚀</label>
+                <textarea x-model="profile.goal" rows="2" placeholder="e.g., I want to develop executive presence and learn to lead cross-functional teams..." class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-gold-400 outline-none resize-none"></textarea>
+              </div>
+            </div>
+          </div>
+          <div class="flex gap-3">
+            <button @click="onboardStep = 2" class="flex-1 bg-gray-100 text-gray-700 font-semibold py-4 rounded-xl min-h-[52px]">← Back</button>
+            <button @click="saveProfile()" :disabled="!profile.skills || !profile.commStyle" :class="!profile.skills || !profile.commStyle ? 'opacity-50' : ''" class="flex-1 gold-gradient text-navy-900 font-semibold py-4 rounded-xl shadow-md min-h-[52px]">Complete Setup ✨</button>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <!-- TAB: MATCHES -->
+    <template x-if="currentUser && activeTab === 'matches'">
+      <div class="slide-enter space-y-4">
+        <div class="flex items-center justify-between">
+          <h2 class="text-lg font-bold text-navy-800">🔮 AI-Powered Matches</h2>
+          <button @click="findMatches()" class="bg-navy-800 text-white text-sm font-medium px-4 py-2.5 rounded-xl min-h-[44px] flex items-center gap-1.5">
+            <span>Find Matches</span>
+            <span>✨</span>
+          </button>
+        </div>
+
+        <template x-if="matches.length === 0 && !loading">
+          <div class="text-center py-12">
+            <div class="text-5xl mb-4">🔍</div>
+            <p class="text-gray-500 mb-2">No matches yet</p>
+            <p class="text-gray-400 text-sm">Tap "Find Matches" to let AI discover your ideal <span x-text="currentUser.role === 'mentor' ? 'mentees' : 'mentors'"></span></p>
+          </div>
+        </template>
+
+        <template x-for="match in matches" :key="match.name">
+          <div class="bg-white rounded-2xl p-5 shadow-sm border card-hover">
+            <div class="flex items-start gap-4">
+              <!-- Compatibility Ring -->
+              <div class="relative w-16 h-16 flex-shrink-0">
+                <div class="match-ring w-16 h-16 rounded-full flex items-center justify-center" :style="'--pct: ' + (match.compatibility * 3.6) + 'deg'">
+                  <div class="bg-white w-12 h-12 rounded-full flex items-center justify-center">
+                    <span class="font-bold text-navy-800 text-sm" x-text="match.compatibility + '%'"></span>
+                  </div>
+                </div>
+              </div>
+              <div class="flex-1 min-w-0">
+                <h3 class="font-semibold text-navy-800" x-text="match.name"></h3>
+                <p class="text-xs text-gray-400" x-text="match.title + ' • ' + match.department"></p>
+                <p class="text-xs text-gray-500 mt-1" x-text="match.experience + ' years experience'"></p>
+                <div class="flex flex-wrap gap-1 mt-2">
+                  <template x-for="skill in match.matchedSkills.slice(0, 3)" :key="skill">
+                    <span class="bg-gold-50 text-gold-700 text-xs px-2 py-0.5 rounded-full" x-text="skill"></span>
+                  </template>
+                </div>
+              </div>
+            </div>
+            <p class="text-sm text-gray-600 mt-3 leading-relaxed" x-text="match.reason"></p>
+            <div class="flex gap-2 mt-4">
+              <button @click="requestMatch(match)" class="flex-1 gold-gradient text-navy-900 font-semibold py-3 rounded-xl text-sm min-h-[44px]">
+                Connect 🤝
+              </button>
+              <button @click="viewMatchDetail(match)" class="bg-gray-100 text-gray-600 font-medium py-3 px-4 rounded-xl text-sm min-h-[44px]">
+                Details
+              </button>
+            </div>
+          </div>
+        </template>
+      </div>
+    </template>
+
+    <!-- TAB: ENGAGEMENTS -->
+    <template x-if="currentUser && activeTab === 'engagements'">
+      <div class="slide-enter space-y-4">
+        <h2 class="text-lg font-bold text-navy-800">📅 Active Engagements</h2>
+
+        <template x-if="engagements.length === 0">
+          <div class="text-center py-12">
+            <div class="text-5xl mb-4">🤝</div>
+            <p class="text-gray-500 mb-2">No active engagements</p>
+            <p class="text-gray-400 text-sm">Connect with a match to start mentoring</p>
+          </div>
+        </template>
+
+        <template x-for="eng in engagements" :key="eng.id">
+          <div class="bg-white rounded-2xl shadow-sm border overflow-hidden">
+            <div class="gradient-bg px-5 py-3 flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-full gold-gradient flex items-center justify-center text-navy-900 font-bold text-xs" x-text="getInitials(eng.partnerName)"></div>
+                <div>
+                  <p class="text-white font-semibold text-sm" x-text="eng.partnerName"></p>
+                  <p class="text-navy-200 text-xs" x-text="eng.partnerTitle"></p>
+                </div>
+              </div>
+              <span class="bg-sage-500/30 text-sage-100 text-xs px-2 py-1 rounded-full" x-text="eng.status"></span>
+            </div>
+            <div class="p-5 space-y-3">
+              <!-- Progress -->
+              <div>
+                <div class="flex justify-between text-xs text-gray-500 mb-1">
+                  <span>Development Progress</span>
+                  <span x-text="eng.progress + '%'"></span>
+                </div>
+                <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div class="h-full bg-gold-500 rounded-full transition-all" :style="'width: ' + eng.progress + '%'"></div>
+                </div>
+              </div>
+              <!-- Next Meeting -->
+              <div class="bg-navy-50 rounded-xl p-3 flex items-center gap-3">
+                <span class="text-2xl">📆</span>
+                <div>
+                  <p class="text-xs text-gray-500">Next Meeting</p>
+                  <p class="text-sm font-semibold text-navy-800" x-text="eng.nextMeeting || 'Not scheduled'"></p>
+                </div>
+              </div>
+              <!-- Goals -->
+              <div>
+                <p class="text-xs text-gray-500 mb-2">Development Goals</p>
+                <template x-for="goal in eng.goals" :key="goal.text">
+                  <div class="flex items-center gap-2 py-1">
+                    <button @click="goal.done = !goal.done; saveData()" :class="goal.done ? 'bg-sage-500 text-white' : 'border-2 border-gray-300'" class="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-xs">
+                      <span x-show="goal.done">✓</span>
+                    </button>
+                    <span :class="goal.done ? 'line-through text-gray-400' : 'text-gray-700'" class="text-sm" x-text="goal.text"></span>
+                  </div>
+                </template>
+              </div>
+              <!-- Actions -->
+              <div class="flex gap-2 pt-2">
+                <button @click="generateCoachingScript(eng)" class="flex-1 bg-navy-800 text-white font-medium py-3 rounded-xl text-sm min-h-[44px]">
+                  💬 Coaching Script
+                </button>
+                <button @click="optimizeSchedule(eng)" class="flex-1 bg-gold-50 text-gold-700 font-medium py-3 rounded-xl text-sm min-h-[44px]">
+                  📅 Schedule
+                </button>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+    </template>
+
+    <!-- TAB: SCRIPTS -->
+    <template x-if="currentUser && activeTab === 'scripts'">
+      <div class="slide-enter space-y-4">
+        <h2 class="text-lg font-bold text-navy-800">💬 AI Coaching Scripts</h2>
+        <p class="text-gray-500 text-sm">Generate conversation guides for productive mentoring sessions</p>
+
+        <div class="bg-white rounded-2xl p-5 shadow-sm border space-y-3">
+          <div>
+            <label class="text-xs font-medium text-gray-500 mb-1 block">Session Topic</label>
+            <select x-model="scriptTopic" class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-gold-400 outline-none bg-white">
+              <option value="">Choose a topic...</option>
+              <option>First Meeting / Icebreaker</option>
+              <option>Career Transition Guidance</option>
+              <option>Leadership Development</option>
+              <option>Navigating Office Politics</option>
+              <option>Work-Life Balance</option>
+              <option>Building Executive Presence</option>
+              <option>Knowledge Transfer & Legacy</option>
+              <option>Conflict Resolution</option>
+              <option>Goal Setting & Review</option>
+              <option>Closing / Graduation Session</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-xs font-medium text-gray-500 mb-1 block">Additional Context (optional)</label>
+            <textarea x-model="scriptContext" rows="2" placeholder="e.g., Mentee recently got promoted and feels overwhelmed..." class="w-full border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-gold-400 outline-none resize-none"></textarea>
+          </div>
+          <button @click="generateScript()" :disabled="!scriptTopic" :class="!scriptTopic ? 'opacity-50' : ''" class="w-full gold-gradient text-navy-900 font-semibold py-4 rounded-xl shadow-md min-h-[52px]">
+            Generate Script ✨
+          </button>
+        </div>
+
+        <template x-if="generatedScript">
+          <div class="bg-white rounded-2xl p-5 shadow-sm border space-y-4">
+            <h3 class="font-semibold text-navy-800 flex items-center gap-2">
+              <span>📝</span>
+              <span x-text="generatedScript.title"></span>
+            </h3>
+            <div class="space-y-3">
+              <div class="bg-navy-50 rounded-xl p-4">
+                <p class="text-xs font-semibold text-navy-600 mb-1">🎯 Session Goal</p>
+                <p class="text-sm text-navy-800" x-text="generatedScript.goal"></p>
+              </div>
+              <div>
+                <p class="text-xs font-semibold text-gray-500 mb-2">💡 Opening Questions</p>
+                <template x-for="q in generatedScript.openingQuestions" :key="q">
+                  <div class="bg-gold-50 rounded-lg p-3 mb-2">
+                    <p class="text-sm text-gold-800" x-text="q"></p>
+                  </div>
+                </template>
+              </div>
+              <div>
+                <p class="text-xs font-semibold text-gray-500 mb-2">🗣️ Discussion Prompts</p>
+                <template x-for="p in generatedScript.discussionPrompts" :key="p">
+                  <div class="border-l-3 border-navy-300 pl-3 mb-2">
+                    <p class="text-sm text-gray-700" x-text="p"></p>
+                  </div>
+                </template>
+              </div>
+              <div class="bg-sage-50 rounded-xl p-4">
+                <p class="text-xs font-semibold text-sage-600 mb-1">✅ Action Items Template</p>
+                <p class="text-sm text-sage-800" x-text="generatedScript.actionItems"></p>
+              </div>
+              <div class="bg-gray-50 rounded-xl p-4">
+                <p class="text-xs font-semibold text-gray-500 mb-1">⏱️ Suggested Duration</p>
+                <p class="text-sm text-gray-700" x-text="generatedScript.duration"></p>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <!-- Saved Scripts -->
+        <template x-if="savedScripts.length > 0">
+          <div>
+            <h3 class="text-sm font-semibold text-gray-500 mb-2">📚 Saved Scripts</h3>
+            <template x-for="script in savedScripts" :key="script.title + script.date">
+              <button @click="generatedScript = script" class="w-full bg-white rounded-xl p-4 shadow-sm border mb-2 text-left card-hover min-h-[44px]">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="font-medium text-sm text-navy-800" x-text="script.title"></p>
+                    <p class="text-xs text-gray-400" x-text="script.date"></p>
+                  </div>
+                  <span class="text-gray-300">→</span>
+                </div>
+              </button>
+            </template>
+          </div>
+        </template>
+      </div>
+    </template>
+
+    <!-- TAB: DASHBOARD -->
+    <template x-if="currentUser && activeTab === 'dashboard'">
+      <div class="slide-enter space-y-4">
+        <h2 class="text-lg font-bold text-navy-800">📊 Impact Dashboard</h2>
+
+        <!-- Stats Grid -->
+        <div class="grid grid-cols-2 gap-3">
+          <div class="bg-white rounded-2xl p-4 shadow-sm border text-center">
+            <div class="text-3xl font-bold text-navy-800" x-text="dashStats.totalSessions"></div>
+            <div class="text-xs text-gray-500 mt-1">Sessions Held</div>
+          </div>
+          <div class="bg-white rounded-2xl p-4 shadow-sm border text-center">
+            <div class="text-3xl font-bold text-gold-600" x-text="dashStats.hoursInvested + 'h'"></div>
+            <div class="text-xs text-gray-500 mt-1">Hours Invested</div>
+          </div>
+          <div class="bg-white rounded-2xl p-4 shadow-sm border text-center">
+            <div class="text-3xl font-bold text-sage-600" x-text="dashStats.goalsCompleted"></div>
+            <div class="text-xs text-gray-500 mt-1">Goals Completed</div>
+          </div>
+          <div class="bg-white rounded-2xl p-4 shadow-sm border text-center">
+            <div class="text-3xl font-bold text-navy-600" x-text="dashStats.activeEngagements"></div>
+            <div class="text-xs text-gray-500 mt-1">Active Pairs</div>
+          </div>
+        </div>
+
+        <!-- AI Insights -->
+        <div class="bg-white rounded-2xl p-5 shadow-sm border">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="font-semibold text-navy-800">🧠 AI Insights</h3>
+            <button @click="generateInsights()" class="text-xs bg-navy-100 text-navy-600 px-3 py-1.5 rounded-full font-medium min-h-[36px]">Refresh</button>
+          </div>
+          <template x-if="insights.length > 0">
+            <div class="space-y-3">
+              <template x-for="insight in insights" :key="insight.text">
+                <div class="flex gap-3 items-start">
+                  <span class="text-xl" x-text="insight.icon"></span>
+                  <div>
+                    <p class="text-sm text-gray-700" x-text="insight.text"></p>
+                    <p class="text-xs text-gray-400 mt-0.5" x-text="insight.type"></p>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </template>
+          <template x-if="insights.length === 0">
+            <p class="text-sm text-gray-400 text-center py-4">Tap refresh to generate AI insights ✨</p>
+          </template>
+        </div>
+
+        <!-- Development Plan -->
+        <div class="bg-white rounded-2xl p-5 shadow-sm border">
+          <h3 class="font-semibold text-navy-800 mb-3">📈 Development Milestones</h3>
+          <div class="space-y-3">
+            <template x-for="(milestone, idx) in milestones" :key="idx">
+              <div class="flex items-center gap-3">
+                <div :class="milestone.done ? 'bg-sage-500' : 'bg-gray-200'" class="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-xs flex-shrink-0" x-text="milestone.done ? '✓' : (idx + 1)"></div>
+                <div class="flex-1">
+                  <p :class="milestone.done ? 'text-gray-400 line-through' : 'text-gray-700'" class="text-sm font-medium" x-text="milestone.text"></p>
+                  <p class="text-xs text-gray-400" x-text="milestone.target"></p>
+                </div>
+                <button @click="milestone.done = !milestone.done; saveData()" class="w-10 h-10 flex items-center justify-center rounded-full" :class="milestone.done ? 'bg-sage-50' : 'bg-gray-50'">
+                  <span x-text="milestone.done ? '↩️' : '✅'" class="text-sm"></span>
+                </button>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- Reset -->
+        <button @click="if(confirm('Reset all data? This cannot be undone.')) { localStorage.clear(); location.reload(); }" class="w-full bg-red-50 text-red-500 font-medium py-3 rounded-xl text-sm min-h-[44px]">
+          🗑️ Reset All Data
+        </button>
+      </div>
+    </template>
+
+  </main>
+
+  <!-- Match Detail Modal -->
+  <div x-show="showMatchDetail" x-cloak x-transition class="fixed inset-0 bg-black/50 z-40 flex items-end justify-center" @click.self="showMatchDetail = false">
+    <div class="bg-white rounded-t-3xl w-full max-w-lg max-h-[85vh] overflow-y-auto p-6 space-y-4">
+      <div class="flex justify-between items-center">
+        <h3 class="font-bold text-lg text-navy-800">Match Details</h3>
+        <button @click="showMatchDetail = false" class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">✕</button>
+      </div>
+      <template x-if="selectedMatch">
+        <div class="space-y-4">
+          <div class="flex items-center gap-4">
+            <div class="relative w-20 h-20">
+              <div class="match-ring w-20 h-20 rounded-full flex items-center justify-center" :style="'--pct: ' + (selectedMatch.compatibility * 3.6) + 'deg'">
+                <div class="bg-white w-16 h-16 rounded-full flex items-center justify-center">
+                  <span class="font-bold text-navy-800 text-lg" x-text="selectedMatch.compatibility + '%'"></span>
+                </div>
+              </div>
+            </div>
+            <div>
+              <h4 class="font-bold text-navy-800 text-lg" x-text="selectedMatch.name"></h4>
+              <p class="text-sm text-gray-500" x-text="selectedMatch.title"></p>
+              <p class="text-xs text-gray-400" x-text="selectedMatch.department + ' • ' + selectedMatch.experience + ' years'"></p>
+            </div>
+          </div>
+          <div class="bg-navy-50 rounded-xl p-4">
+            <p class="text-xs font-semibold text-navy-600 mb-1">Why This Match Works</p>
+            <p class="text-sm text-navy-800" x-text="selectedMatch.reason"></p>
+          </div>
+          <div>
+            <p class="text-xs font-semibold text-gray-500 mb-2">Matched Skills</p>
+            <div class="flex flex-wrap gap-2">
+              <template x-for="skill in selectedMatch.matchedSkills" :key="skill">
+                <span class="bg-gold-50 text-gold-700 text-sm px-3 py-1 rounded-full" x-text="skill"></span>
+              </template>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="bg-gray-50 rounded-xl p-3">
+              <p class="text-xs text-gray-500">Communication</p>
+              <p class="text-sm font-medium text-gray-700" x-text="selectedMatch.commStyle"></p>
+            </div>
+            <div class="bg-gray-50 rounded-xl p-3">
+              <p class="text-xs text-gray-500">Availability</p>
+              <p class="text-sm font-medium text-gray-700" x-text="selectedMatch.availability"></p>
+            </div>
+          </div>
+          <button @click="requestMatch(selectedMatch); showMatchDetail = false;" class="w-full gold-gradient text-navy-900 font-semibold py-4 rounded-xl shadow-md min-h-[52px]">
+            Start Engagement 🚀
+          </button>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <!-- Coaching Script Modal -->
+  <div x-show="showScriptModal" x-cloak x-transition class="fixed inset-0 bg-black/50 z-40 flex items-end justify-center" @click.self="showScriptModal = false">
+    <div class="bg-white rounded-t-3xl w-full max-w-lg max-h-[85vh] overflow-y-auto p-6 space-y-4">
+      <div class="flex justify-between items-center">
+        <h3 class="font-bold text-lg text-navy-800">💬 Session Script</h3>
+        <button @click="showScriptModal = false" class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">✕</button>
+      </div>
+      <template x-if="modalScript">
+        <div class="space-y-4">
+          <div class="bg-navy-50 rounded-xl p-4">
+            <p class="text-xs font-semibold text-navy-600 mb-1">🎯 Session Goal</p>
+            <p class="text-sm text-navy-800" x-text="modalScript.goal"></p>
+          </div>
+          <div>
+            <p class="text-xs font-semibold text-gray-500 mb-2">💡 Opening</p>
+            <template x-for="q in modalScript.openingQuestions" :key="q">
+              <div class="bg-gold-50 rounded-lg p-3 mb-2">
+                <p class="text-sm text-gold-800" x-text="q"></p>
+              </div>
+            </template>
+          </div>
+          <div>
+            <p class="text-xs font-semibold text-gray-500 mb-2">🗣️ Discussion</p>
+            <template x-for="p in modalScript.discussionPrompts" :key="p">
+              <div class="border-l-2 border-navy-300 pl-3 mb-2">
+                <p class="text-sm text-gray-700" x-text="p"></p>
+              </div>
+            </template>
+          </div>
+          <div class="bg-sage-50 rounded-xl p-4">
+            <p class="text-xs font-semibold text-sage-600 mb-1">✅ Action Items</p>
+            <p class="text-sm text-sage-800" x-text="modalScript.actionItems"></p>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <!-- Schedule Modal -->
+  <div x-show="showScheduleModal" x-cloak x-transition class="fixed inset-0 bg-black/50 z-40 flex items-end justify-center" @click.self="showScheduleModal = false">
+    <div class="bg-white rounded-t-3xl w-full max-w-lg max-h-[85vh] overflow-y-auto p-6 space-y-4">
+      <div class="flex justify-between items-center">
+        <h3 class="font-bold text-lg text-navy-800">📅 Smart Schedule</h3>
+        <button @click="showScheduleModal = false" class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">✕</button>
+      </div>
+      <template x-if="scheduleOptions.length > 0">
+        <div class="space-y-3">
+          <p class="text-sm text-gray-500">AI-optimized time slots for both participants:</p>
+          <template x-for="opt in scheduleOptions" :key="opt.slot">
+            <button @click="selectSchedule(opt)" class="w-full border-2 rounded-xl p-4 text-left transition-all min-h-[44px]" :class="opt.selected ? 'border-gold-500 bg-gold-50' : 'border-gray-200 hover:border-gray-300'">
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="font-semibold text-sm text-navy-800" x-text="opt.slot"></p>
+                  <p class="text-xs text-gray-500" x-text="opt.reason"></p>
+                </div>
+                <div class="text-right">
+                  <div class="text-xs font-medium" :class="opt.score >= 90 ? 'text-sage-600' : opt.score >= 70 ? 'text-gold-600' : 'text-gray-500'" x-text="opt.score + '% optimal'"></div>
+                </div>
+              </div>
+            </button>
+          </template>
+          <button @click="confirmSchedule()" class="w-full gold-gradient text-navy-900 font-semibold py-4 rounded-xl shadow-md min-h-[52px]">
+            Confirm Schedule ✅
+          </button>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <!-- Settings Panel -->
+  <div x-show="showSettings" x-cloak x-transition class="fixed inset-0 bg-black/50 z-40 flex items-end justify-center" @click.self="showSettings = false">
+    <div class="bg-white rounded-t-3xl w-full max-w-lg p-6 space-y-4">
+      <div class="flex justify-between items-center">
+        <h3 class="font-bold text-lg text-navy-800">⚙️ Settings</h3>
+        <button @click="showSettings = false" class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">✕</button>
+      </div>
+      <template x-if="currentUser">
+        <div class="space-y-3">
+          <div class="bg-gray-50 rounded-xl p-4">
+            <p class="text-xs text-gray-500">Profile</p>
+            <p class="font-medium text-navy-800" x-text="currentUser.name"></p>
+            <p class="text-sm text-gray-500" x-text="currentUser.title + ' • ' + currentUser.department"></p>
+            <p class="text-sm text-gray-400" x-text="currentUser.role === 'mentor' ? '🎓 Mentor' : '🌱 Mentee'"></p>
+          </div>
+          <div class="bg-gray-50 rounded-xl p-4">
+            <p class="text-xs text-gray-500 mb-1">AI Usage Stats</p>
+            <p class="text-sm text-gray-700">Total AI calls: <span class="font-medium" x-text="totalAICalls"></span></p>
+            <p class="text-sm text-gray-700">Total tokens: <span class="font-medium" x-text="totalInputTokens + totalOutputTokens"></span></p>
+            <p class="text-sm text-gray-700">Total time: <span class="font-medium" x-text="Math.round(totalAITime / 1000) + 's'"></span></p>
+          </div>
+          <button @click="currentUser = null; showSettings = false; onboardStep = 1;" class="w-full bg-gray-100 text-gray-600 font-medium py-3 rounded-xl min-h-[44px]">Switch Profile</button>
+          <button @click="if(confirm('Delete all data?')) { localStorage.clear(); location.reload(); }" class="w-full bg-red-50 text-red-500 font-medium py-3 rounded-xl min-h-[44px]">Reset Everything</button>
+        </div>
+      </template>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// Global AI tracking
+window.totalInputTokens = 0;
+window.totalOutputTokens = 0;
+window.totalAITime = 0;
+window.totalAICalls = 0;
+window.aiTimeByAlias = {};
+
+async function callAI(alias, params, retries = 3) {
+  const start = Date.now();
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const resp = await fetch('https://16504442930.work/run_prompt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ alias, params })
+      });
+      if (!resp.ok) {
+        const text = await resp.text();
+        if (attempt === retries - 1) {
+          // Format error with AI
+          try {
+            const errResp = await fetch('https://16504442930.work/run_prompt', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                alias: 'genericAI',
+                params: {
+                  prompt: `Reformat this API error into a user-friendly message that empowers them to fix it. Include the full original error. Error: ${text}. Return JSON with key "message" as a string.`
+                }
+              })
+            });
+            const errData = await errResp.json();
+            throw new Error(errData.message || text);
+          } catch(e2) {
+            throw new Error(`API Error (attempt ${attempt+1}/${retries}): ${text}`);
+          }
+        }
+        await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+        continue;
+      }
+      const data = await resp.json();
+      const elapsed = Date.now() - start;
+      window.totalAITime += elapsed;
+      window.totalAICalls++;
+      if (!window.aiTimeByAlias[alias]) window.aiTimeByAlias[alias] = 0;
+      window.aiTimeByAlias[alias] += elapsed;
+      if (data.usage) {
+        window.totalInputTokens += (data.usage.input_tokens || data.usage.prompt_tokens || 0);
+        window.totalOutputTokens += (data.usage.output_tokens || data.usage.completion_tokens || 0);
+      }
+      return data;
+    } catch (err) {
+      if (attempt === retries - 1) throw err;
+      await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+    }
+  }
+}
+
+function mentorApp() {
+  return {
+    // State
+    loading: false,
+    loadingMessage: 'Processing...',
+    errorMessage: '',
+    successMessage: '',
+    currentUser: null,
+    onboardStep: 1,
+    activeTab: 'matches',
+    showSettings: false,
+    showMatchDetail: false,
+    showScriptModal: false,
+    showScheduleModal: false,
+
+    // Profile
+    profile: {
+      name: '', email: '', role: '', department: '', experience: '',
+      title: '', timezone: '', skills: '', commStyle: '', availability: '',
+      legacy: '', goal: ''
+    },
+
+    // Data
+    matches: [],
+    engagements: [],
+    selectedMatch: null,
+    generatedScript: null,
+    savedScripts: [],
+    modalScript: null,
+    scheduleOptions: [],
+    currentEngagement: null,
+    scriptTopic: '',
+    scriptContext: '',
+    insights: [],
+    milestones: [],
+    dashStats: { totalSessions: 0, hoursInvested: 0, goalsCompleted: 0, activeEngagements: 0 },
+
+    // AI tracking getters
+    get totalAICalls() { return window.totalAICalls; },
+    get totalInputTokens() { return window.totalInputTokens; },
+    get totalOutputTokens() { return window.totalOutputTokens; },
+    get totalAITime() { return window.totalAITime; },
+
+    // Tabs
+    tabs: [
+      { id: 'matches', label: 'Matches', icon: '🔮' },
+      { id: 'engagements', label: 'Sessions', icon: '📅' },
+      { id: 'scripts', label: 'Scripts', icon: '💬' },
+      { id: 'dashboard', label: 'Dashboard', icon: '📊' }
+    ],
+
+    init() {
+      // Load from localStorage
+      const saved = localStorage.getItem('mentorMatchData');
+      if (saved) {
+        try {
+          const data = JSON.parse(saved);
+          this.currentUser = data.currentUser || null;
+          this.matches = data.matches || [];
+          this.engagements = data.engagements || [];
+          this.savedScripts = data.savedScripts || [];
+          this.insights = data.insights || [];
+          this.milestones = data.milestones || this.getDefaultMilestones();
+          this.dashStats = data.dashStats || this.dashStats;
+        } catch(e) { console.error('Load error:', e); }
+      }
+      if (!this.milestones || this.milestones.length === 0) {
+        this.milestones = this.getDefaultMilestones();
+      }
+      this.updateDashStats();
+    },
+
+    getDefaultMilestones() {
+      return [
+        { text: 'Complete profile setup', target: 'Week 1', done: false },
+        { text: 'Connect with first match', target: 'Week 1-2', done: false },
+        { text: 'Hold first mentoring session', target: 'Week 2', done: false },
+        { text: 'Set 3 development goals', target: 'Week 3', done: false },
+        { text: 'Complete 4 sessions', target: 'Month 1', done: false },
+        { text: 'Midpoint review & adjust goals', target: 'Month 2', done: false },
+        { text: 'Share a key knowledge artifact', target: 'Month 3', done: false },
+        { text: 'Celebrate progress & plan next steps', target: 'Month 3', done: false }
+      ];
+    },
+
+    saveData() {
+      this.updateDashStats();
+      localStorage.setItem('mentorMatchData', JSON.stringify({
+        currentUser: this.currentUser,
+        matches: this.matches,
+        engagements: this.engagements,
+        savedScripts: this.savedScripts,
+        insights: this.insights,
+        milestones: this.milestones,
+        dashStats: this.dashStats
+      }));
+    },
+
+    updateDashStats() {
+      const completedGoals = this.engagements.reduce((sum, eng) => sum + (eng.goals || []).filter(g => g.done).length, 0);
+      this.dashStats = {
+        totalSessions: this.engagements.reduce((sum, eng) => sum + (eng.sessionsHeld || 0), 0),
+        hoursInvested: this.engagements.reduce((sum, eng) => sum + (eng.hoursSpent || 0), 0),
+        goalsCompleted: completedGoals,
+        activeEngagements: this.engagements.length
+      };
+    },
+
+    getInitials(name) {
+      if (!name) return '?';
+      return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    },
+
+    showSuccess(msg) {
+      this.successMessage = msg;
+      setTimeout(() => this.successMessage = '', 3000);
+    },
+
+    saveProfile() {
+      this.currentUser = { ...this.profile };
+      this.milestones[0].done = true;
+      this.saveData();
+      this.showSuccess('Profile created! Let\'s find your perfect matches 🎉');
+    },
+
+    async findMatches() {
+      this.loading = true;
+      this.loadingMessage = 'Finding your ideal matches...';
+      try {
+        const userDesc = this.currentUser.role === 'mentor'
+          ? `Mentor: ${this.currentUser.name}, ${this.currentUser.title} in ${this.currentUser.department}, ${this.currentUser.experience} years experience, can teach: ${this.currentUser.skills}, communication style: ${this.currentUser.commStyle}, availability: ${this.currentUser.availability}h/month, timezone: ${this.currentUser.timezone}, legacy goal: ${this.currentUser.legacy || 'N/A'}`
+          : `Mentee: ${this.currentUser.name}, ${this.currentUser.title} in ${this.currentUser.department}, ${this.currentUser.experience} years experience, wants to learn: ${this.currentUser.skills}, communication style: ${this.currentUser.commStyle}, availability: ${this.currentUser.availability}h/month, timezone: ${this.currentUser.timezone}, growth goal: ${this.currentUser.goal || 'N/A'}`;
+
+        const matchType = this.currentUser.role === 'mentor' ? 'mentees' : 'mentors';
+
+        const data = await callAI('genericAI', {
+          prompt: `You are an expert corporate mentor-mentee matching system. Based on this user profile, generate 4 highly compatible ${matchType} matches for a corporate mentoring program.
+
+User Profile: ${userDesc}
+
+Generate realistic but fictional ${matchType} that would be great matches based on skill complementarity, communication style compatibility, timezone overlap, and availability alignment.
+
+Return EXACTLY this JSON structure:
+{
+  "matches": [
+    {
+      "name": "string (realistic full name)",
+      "title": "string (job title)",
+      "department": "string (department name)",
+      "experience": "number (years of experience, integer)",
+      "compatibility": "number (integer between 72 and 97, representing percentage)",
+      "commStyle": "string (communication style)",
+      "availability": "string (like '4-8h')",
+      "matchedSkills": ["string", "string", "string"] (array of 2-4 skill strings that overlap or complement),
+      "reason": "string (2-3 sentences explaining why this is a great match, referencing specific skills and compatibility factors)"
+    }
+  ]
+}
+
+Return exactly 4 matches, sorted by compatibility score descending. Make the reasons specific and insightful, referencing actual skill overlaps and complementary traits.`
+        });
+
+        this.matches = data.matches || [];
+        this.matches.sort((a, b) => b.compatibility - a.compatibility);
+        this.saveData();
+        this.showSuccess(`Found ${this.matches.length} great matches! 🎯`);
+      } catch (err) {
+        this.errorMessage = 'Failed to find matches: ' + err.message;
+      } finally {
+        this.loading = false;
+      }
+    },
+
+    viewMatchDetail(match) {
+      this.selectedMatch = match;
+      this.showMatchDetail = true;
+    },
+
+    requestMatch(match) {
+      const exists = this.engagements.find(e => e.partnerName === match.name);
+      if (exists) {
+        this.showSuccess('You\'re already connected with ' + match.name + '! 🤝');
+        return;
+      }
+
+      const engagement = {
+        id: Date.now().toString(),
+        partnerName: match.name,
+        partnerTitle: match.title,
+        partnerDept: match.department,
+        compatibility: match.compatibility,
+        status: 'Active',
+        progress: 10,
+        nextMeeting: null,
+        sessionsHeld: 0,
+        hoursSpent: 0,
+        goals: [
+          { text: 'Establish rapport and set expectations', done: false },
+          { text: 'Define 3 specific development goals', done: false },
+          { text: 'Complete first skill-building exercise', done: false },
+          { text: 'Midpoint progress review', done: false },
+          { text: 'Create a knowledge transfer artifact', done: false }
+        ],
+        createdAt: new Date().toISOString()
+      };
+
+      this.engagements.push(engagement);
+      if (this.milestones.length > 1) this.milestones[1].done = true;
+      this.saveData();
+      this.activeTab = 'engagements';
+      this.showSuccess('Connected with ' + match.name + '! 🎉');
+    },
+
+    async generateCoachingScript(eng) {
+      this.loading = true;
+      this.loadingMessage = 'Crafting your coaching script...';
+      try {
+        const data = await callAI('genericAI', {
+          prompt: `You are an expert executive coaching facilitator specializing in senior-to-junior knowledge transfer in corporate settings.
+
+Generate a detailed coaching conversation script for an upcoming mentoring session.
+
+Mentor/Mentee context:
+- User: ${this.currentUser.name}, ${this.currentUser.title} (${this.currentUser.role})
+- Partner: ${eng.partnerName}, ${eng.partnerTitle}
+- Sessions held so far: ${eng.sessionsHeld}
+- Current progress: ${eng.progress}%
+- Focus area: ${this.currentUser.skills}
+
+Return EXACTLY this JSON structure:
+{
+  "title": "string (descriptive session title)",
+  "goal": "string (one clear session goal)",
+  "openingQuestions": ["string", "string", "string"] (exactly 3 warm-up questions),
+  "discussionPrompts": ["string", "string", "string", "string"] (exactly 4 deep discussion prompts),
+  "actionItems": "string (template for what both parties should commit to)",
+  "duration": "string (suggested session duration with time breakdown)"
+}
+
+Make the script warm, professional, and focused on practical knowledge transfer. Include specific techniques for drawing out institutional knowledge and building confidence.`
+        });
+
+        this.modalScript = data;
+        this.showScriptModal = true;
+      } catch (err) {
+        this.errorMessage = 'Failed to generate script: ' + err.message;
+      } finally {
+        this.loading = false;
+      }
+    },
+
+    async optimizeSchedule(eng) {
+      this.loading = true;
+      this.loadingMessage = 'Optimizing schedules...';
+      this.currentEngagement = eng;
+      try {
+        const data = await callAI('genericAI', {
+          prompt: `You are a smart scheduling optimization system for corporate mentoring pairs across time zones.
+
+Context:
+- Person 1 timezone: ${this.currentUser.timezone || 'US/Eastern (ET)'}
+- Person 2 is in a potentially different timezone
+- Both prefer ${this.currentUser.availability || '4-8'} hours per month of mentoring
+- Sessions should be 45-60 minutes
+- Prefer weekday business hours but be flexible
+
+Generate 5 optimal recurring meeting slot options for the next 2 weeks starting from today (${new Date().toLocaleDateString()}).
+
+Return EXACTLY this JSON structure:
+{
+  "options": [
+    {
+      "slot": "string (readable date and time, e.g., 'Tuesday, Jan 14 at 2:00 PM ET')",
+      "reason": "string (brief reason why this slot is optimal)",
+      "score": "number (integer 65-98 representing optimization score)",
+      "selected": false
+    }
+  ]
+}
+
+Return exactly 5 options sorted by score descending. Make slots realistic and varied across different days and times.`
+        });
+
+        this.scheduleOptions = data.options || [];
+        this.showScheduleModal = true;
+      } catch (err) {
+        this.errorMessage = 'Failed to optimize schedule: ' + err.message;
+      } finally {
+        this.loading = false;
+      }
+    },
+
+    selectSchedule(opt) {
+      this.scheduleOptions.forEach(o => o.selected = false);
+      opt.selected = true;
+    },
+
+    confirmSchedule() {
+      const selected = this.scheduleOptions.find(o => o.selected);
+      if (!selected) {
+        this.errorMessage = 'Please select a time slot first';
+        return;
+      }
+      if (this.currentEngagement) {
+        this.currentEngagement.nextMeeting = selected.slot;
+        this.currentEngagement.sessionsHeld = (this.currentEngagement.sessionsHeld || 0) + 1;
+        this.currentEngagement.hoursSpent = (this.currentEngagement.hoursSpent || 0) + 1;
+        this.currentEngagement.progress = Math.min(100, this.currentEngagement.progress + 15);
+        this.saveData();
+      }
+      this.showScheduleModal = false;
+      this.showSuccess('Meeting scheduled: ' + selected.slot + ' 📅');
+    },
+
+    async generateScript() {
+      this.loading = true;
+      this.loadingMessage = 'Creating your conversation guide...';
+      try {
+        const data = await callAI('genericAI', {
+          prompt: `You are an expert executive coaching facilitator specializing in corporate mentoring for senior leaders and emerging talent.
+
+Generate a comprehensive coaching conversation script for this topic:
+Topic: ${this.scriptTopic}
+Additional Context: ${this.scriptContext || 'None provided'}
+User Role: ${this.currentUser.role} (${this.currentUser.title}, ${this.currentUser.department})
+User Skills: ${this.currentUser.skills}
+Communication Style: ${this.currentUser.commStyle}
+
+Return EXACTLY this JSON structure:
+{
+  "title": "string (descriptive session title incorporating the topic)",
+  "goal": "string (one clear, measurable session goal)",
+  "openingQuestions": ["string", "string", "string"] (exactly 3 warm engaging opening questions),
+  "discussionPrompts": ["string", "string", "string", "string", "string"] (exactly 5 thoughtful discussion prompts that progressively deepen the conversation),
+  "actionItems": "string (specific template for post-session commitments both parties should make)",
+  "duration": "string (recommended duration with minute-by-minute breakdown)"
+}
+
+Make the script deeply relevant to the topic, warm yet professional, and optimized for knowledge transfer between experienced and emerging leaders. Include techniques for active listening, reflective questioning, and actionable takeaways.`
+        });
+
+        this.generatedScript = { ...data, date: new Date().toLocaleDateString() };
+        this.savedScripts.unshift(this.generatedScript);
+        if (this.savedScripts.length > 10) this.savedScripts = this.savedScripts.slice(0, 10);
+        this.saveData();
+        this.showSuccess('Script generated! 📝');
+      } catch (err) {
+        this.errorMessage = 'Failed to generate script: ' + err.message;
+      } finally {
+        this.loading = false;
+      }
+    },
+
+    async generateInsights() {
+      this.loading = true;
+      this.loadingMessage = 'Analyzing your mentoring journey...';
+      try {
+        const data = await callAI('genericAI', {
+          prompt: `You are an AI analytics engine for a corporate mentoring platform. Generate personalized insights and recommendations.
+
+User: ${this.currentUser.name}, ${this.currentUser.title}, ${this.currentUser.role}
+Active engagements: ${this.engagements.length}
+Sessions held: ${this.dashStats.totalSessions}
+Hours invested: ${this.dashStats.hoursInvested}
+Goals completed: ${this.dashStats.goalsCompleted}
+Skills: ${this.currentUser.skills}
+
+Return EXACTLY this JSON structure:
+{
+  "insights": [
+    {
+      "icon": "string (single emoji)",
+      "text": "string (1-2 sentence actionable insight)",
+      "type": "string (one of: 'recommendation', 'observation', 'milestone', 'tip')"
+    }
+  ]
+}
+
+Return exactly 4 insights. Make them specific, actionable, and encouraging. Reference the user's actual data. Include at least one celebration of progress and one actionable next step.`
+        });
+
+        this.insights = data.insights || [];
+        this.saveData();
+        this.showSuccess('Insights updated! 🧠');
+      } catch (err) {
+        this.errorMessage = 'Failed to generate insights: ' + err.message;
+      } finally {
+        this.loading = false;
+      }
+    }
+  };
+}
+</script>
+</body>
+</html>
